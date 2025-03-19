@@ -9,6 +9,7 @@
 # ============================================ MODULES IMPORT ============================================
 import streamlit as st
 import plotly.express as px
+from ntscraper import Nitter
 import pandas as pd
 from textblob import TextBlob
 import snscrape.modules.twitter as twt
@@ -18,19 +19,18 @@ import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 import re
 import nltk
-import spacy
 import os
 from nltk.tokenize import RegexpTokenizer
-from nltk.corpus import stopwords   # python -m nltk.downloader stopwords
+from nltk.corpus import stopwords
 
 nltk.download('punkt')  # python -m nltk.downloader punkt
 nltk.download('averaged_perceptron_tagger') # python -m nltk.downloader averaged_perceptron_tagger
 nltk.download('brown') # python -m nltk.downloader brown
 nltk.download('stopwords')  # stopwords
-os.system('python -m spacy download en_core_web_sm')
-os.system("python -m nltk.downloader stopwords")
-os.system("python -m nltk.downloader punkt")
-os.system("python -m nltk.downloader averaged_perceptron_tagger")
+# os.system('python -m spacy download en_core_web_sm')
+# os.system("python -m nltk.downloader stopwords")
+# os.system("python -m nltk.downloader punkt")
+# os.system("python -m nltk.downloader averaged_perceptron_tagger")
 os.system("python -m nltk.downloader brown")
 
 #en_model = spacy.load("en_core_web_sm")
@@ -54,15 +54,18 @@ def stylish_page():
 # =========================================== FUNCTIONS ===========================================
 
 @st.cache_data
-def scrape_tweets(keywords:str, start:str, stop:str, maxTweets:int=50, lang:str="en") -> pd.DataFrame:
-    tweets_list = []
-    for k,tweet in enumerate(twt.TwitterSearchScraper(f'{keywords} lang:{lang} since:{start} until:{stop}').get_items()):
-        if k>=maxTweets:
-            break
-        tweets_list.append([tweet.date, tweet.id, tweet.rawContent, tweet.user.username])
-    data = pd.DataFrame(tweets_list, columns=['datetime', 'tweet_ID', 'text', 'username'])
+def scrape_tweets(keywords:str, start:str, stop:str, maxTweets:int=25) -> pd.DataFrame:
+    tweets_list:list = []
+    scraper:Nitter = get_Nitter_scrapper()
+    tweets:dict = scraper.get_tweets(keywords, mode="term", number=maxTweets, since=start, until=stop)["tweets"]
+    for tweet in tweets:
+        tweets_list.append([tweet["date"], tweet["text"], tweet["user"]["username"]])
+    data = pd.DataFrame(tweets_list, columns=['datetime', 'text', 'username'])
     return data
 
+@st.cache_data
+def get_Nitter_scrapper():
+    return Nitter(log_level=1, skip_instance_check=False)
 
 #clean up the data with a function
 @st.cache_data 
