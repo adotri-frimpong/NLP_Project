@@ -16,23 +16,16 @@ import numpy as np
 import datetime
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
+from typing import Dict, Callable
 import re
 import nltk
 import os
-from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 
 nltk.download('punkt')  # python -m nltk.downloader punkt
 nltk.download('averaged_perceptron_tagger') # python -m nltk.downloader averaged_perceptron_tagger
 nltk.download('brown') # python -m nltk.downloader brown
 nltk.download('stopwords')  # stopwords
-# os.system('python -m spacy download en_core_web_sm')
-# os.system("python -m nltk.downloader stopwords")
-# os.system("python -m nltk.downloader punkt")
-# os.system("python -m nltk.downloader averaged_perceptron_tagger")
-os.system("python -m nltk.downloader brown")
-
-#en_model = spacy.load("en_core_web_sm")
 
 # ============================================ PAGE SETUP CONFIGURATION ===================================
 st.set_page_config(
@@ -56,10 +49,10 @@ def stylish_page():
 def scrape_tweets(keywords:str, start:str, stop:str, maxTweets:int=25) -> pd.DataFrame:
     tweets_list:list = []
     scraper:Nitter = get_Nitter_scrapper()
-    tweets:dict = scraper.get_tweets(keywords, mode="term", number=maxTweets, since=start, until=stop)["tweets"]
+    tweets:Dict[str:str] = scraper.get_tweets(keywords, mode="term", number=maxTweets, since=start, until=stop)["tweets"]
     for tweet in tweets:
         tweets_list.append([tweet["date"], tweet["text"], tweet["user"]["username"]])
-    data = pd.DataFrame(tweets_list, columns=['datetime', 'text', 'username'])
+    data:pd.DataFrame = pd.DataFrame(tweets_list, columns=['datetime', 'text', 'username'])
     return data
 
 @st.cache_data
@@ -68,8 +61,8 @@ def get_Nitter_scrapper():
 
 #clean up the data with a function
 @st.cache_data 
-def text_clean(text:str):
-    text = text.lower()
+def text_clean(text:str) -> str:
+    text:str = text.lower()
     text = re.sub(r'@[A-za-z0-9]+','',str(text))   # Removing Mentions 
     text = re.sub(r'#','',text)        # Removing Hashtags
     text = re.sub(r'https?:\/\/\S+','',text)  # Removing Hyper links
@@ -87,14 +80,14 @@ def text_clean(text:str):
 
 
 # Compute the subjectivity
-getSubjectivity = lambda text: TextBlob(text).sentiment.subjectivity
+getSubjectivity:Callable[[str], float] = lambda text: TextBlob(text).sentiment.subjectivity
 
 
 # Compute the polarity
-getPolarity = lambda text : TextBlob(text).sentiment.polarity
+getPolarity:Callable[[str], float] = lambda text : TextBlob(text).sentiment.polarity
 
 
-def getPolarityAnalysis(score):
+def getPolarityAnalysis(score:float) -> str:
     if score < 0:
       return 'Negative'
     elif 0 < score <=.5:
@@ -102,7 +95,7 @@ def getPolarityAnalysis(score):
     else:
       return 'Positive'
 
-def getSubjectivityAnalysis(score):
+def getSubjectivityAnalysis(score:float) -> str:
   if score <= .45:
       return 'Objective'
   elif .45 < score <= .55:
