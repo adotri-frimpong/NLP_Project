@@ -10,7 +10,7 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
-import snscrape.modules.twitter as twt
+from ntscraper import Nitter
 import re
 import datetime
 # =========================================================================================================
@@ -35,18 +35,25 @@ def stylish_page():
 # =========================================== FUNCTIONS ===========================================
 
 @st.cache_data
-def load_dataset(path:str):
-    data = pd.read_csv(path)
-    return data
+def load_dataset(path:str) -> pd.DataFrame:
+    try:
+        data = pd.read_csv(path)
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {e.__str__()}")
 
 @st.cache_data
-def scrape_tweets(username:str, start:str, stop:str, maxTweets:int=50) -> pd.DataFrame:
-    tweets_list = []
-    for k,tweet in enumerate(twt.TwitterSearchScraper(f'from:{username} since:{start} until:{stop}').get_items()):
-        if k>=maxTweets:
-            break
-        tweets_list.append([tweet.date, tweet.id, tweet.rawContent, tweet.user.username, tweet.likeCount, tweet.retweetCount, tweet.replyCount, tweet.quoteCount, tweet.url])
-    data = pd.DataFrame(tweets_list, columns=['datetime', 'tweet_ID', 'text', 'username', 'likes', 'retweets', 'replies', 'quotes', 'url'])
+def get_Nitter_scrapper():
+    return Nitter(log_level=1, skip_instance_check=False)
+
+@st.cache_data
+def scrape_tweets(username:str, start:str, stop:str, maxTweets:int=25) -> pd.DataFrame:
+    tweets_list:list = []
+    scraper:Nitter = get_Nitter_scrapper()
+    tweets:dict = scraper.get_tweets(username, mode="user", number=maxTweets, since=start.strftime("%Y-%m-%d"), until=stop.strftime("%Y-%m-%d"))["tweets"]
+    for tweet in tweets:
+        tweets_list.append([tweet["date"], tweet["text"], tweet["user"]["username"], tweet["stats"]["likes"], tweet["stats"]["retweets"], tweet["stats"]["comments"], tweet["stats"]["quotes"], tweet["link"]])
+    data = pd.DataFrame(tweets_list, columns=['datetime', 'text', 'username', 'likes', 'retweets', 'replies', 'quotes', 'url'])
     return data
 
 
@@ -70,6 +77,8 @@ def kpis(data:pd.DataFrame, username:str) -> None:
     if len(data)==0:
         st.warning("WARNING : No Data found !", icon="⚠️")
     else:
+        scraper = get_Nitter_scrapper()
+        profile:dict = scraper.get_profile_info(username)
         likes, retweets, replies, quotes  = st.columns(4)
         likes_, retweets_, replies_, quotes_ = data.likes.mean(), data.retweets.mean(), data.replies.mean(), data.quotes.mean()
         likes.metric(label="Mean of likes ❤️", value=round(likes_))  # delta = Différence entre la longitude sélectionnée et la longitude médiane
@@ -80,7 +89,7 @@ def kpis(data:pd.DataFrame, username:str) -> None:
         likes, retweets = data.likes.sum(), data.retweets.sum()
         replies, quotes = data.replies.sum(), data.quotes.sum()
         number_of_tweets = data.shape[0]
-        number_of_followers = twt.TwitterUserScraper(username).entity.followersCount
+        number_of_followers = profile["stats"]["followers"]
         engagement_rate = (((likes+retweets+replies+quotes)/number_of_tweets)/number_of_followers)*100
         st.markdown("### <span style=\"color:#2daae1\">Engagement rate</span>", unsafe_allow_html=True)
         median, rate = st.columns(2)
@@ -116,24 +125,25 @@ def kpis(data:pd.DataFrame, username:str) -> None:
 
 @st.cache_data
 def getEntityProfile(username:str) -> None:
-    entity = twt.TwitterUserScraper(username).entity
+    scraper = get_Nitter_scrapper()
+    entity = scraper.get_profile_info(username)
     if entity == None:
         st.warning("WARNING : No Twitter user found !", icon="⚠️")
     else:
-        picture = entity.profileImageUrl
-        name, nbFollowers, creation = entity.displayname, entity.followersCount, entity.created
-        verified = "No" if entity.verified==False else "Yes"
+        picture = entity["image"]
+        name, nbFollowers, creation = entity["name"], entity["stats"]["followers"], entity["joined"]
+        # verified = "No" if entity.verified==False else "Yes"
         pictureBox, infoBox = st.columns(2)
         with pictureBox:
             st.image(re.sub("normal", "400x400", picture))   # Picture resizing
         with infoBox:
             st.markdown(f">**<span style=\"color:#2daae1\">DISPLAY NAME</span>** :    **{name}**", unsafe_allow_html=True)
-            st.markdown(f">**<span style=\"color:#2daae1\">ACCOUNT CREATION</span>** : **{creation.date()}**", unsafe_allow_html=True)
+            st.markdown(f">**<span style=\"color:#2daae1\">ACCOUNT CREATION</span>** : **{creation}**", unsafe_allow_html=True)
             st.write(f">**<span style=\"color:#2daae1\">FOLLOWERS</span>** : **{nbFollowers}**", unsafe_allow_html=True)
-            if verified == "Yes":
-                st.markdown(f">**<span style=\"color:#2daae1\">CERTIFIED</span>** : **{verified}** <img src=\"https://img.icons8.com/fluency/154/verified-badge.png\" width=\"20\" height=\"20\"></img>", unsafe_allow_html=True)
-            else:
-                st.markdown(f">**<span style=\"color:#2daae1\">CERTIFIED</span>** : **{verified}**", unsafe_allow_html=True)
+            # if verified == "Yes":
+                # st.markdown(f">**<span style=\"color:#2daae1\">CERTIFIED</span>** : **{verified}** <img src=\"https://img.icons8.com/fluency/154/verified-badge.png\" width=\"20\" height=\"20\"></img>", unsafe_allow_html=True)
+            # else:
+                # st.markdown(f">**<span style=\"color:#2daae1\">CERTIFIED</span>** : **{verified}**", unsafe_allow_html=True)
 
 # ===================================================================================================
 
@@ -161,10 +171,6 @@ def main():
             getEntityProfile(twittos)
             kpis(tweets, twittos)
             st.markdown("***")
-            st.markdown("")
-            st.markdown("### <span style=\"color:#2daae1\">**\"Je sais pas vous mais cette application, c'est trop de la balle !\"**</span>", unsafe_allow_html=True)
-            st.image("./images/hey.jpg")
-            #st.markdown("***")
         
 
 # ==================================================================================================
