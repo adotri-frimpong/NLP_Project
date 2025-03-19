@@ -12,7 +12,6 @@ import plotly.express as px
 import pandas as pd
 from ntscraper import Nitter
 import re
-import datetime
 # =========================================================================================================
 
 
