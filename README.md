@@ -35,7 +35,7 @@ $ source .venv/bin/activate
 
 4. Run the app
 ```bash
-$ streamlit run
+$ streamlit run Home.py
 ```
 
 5. Stop the app
