@@ -12,7 +12,6 @@ import plotly.express as px
 from ntscraper import Nitter
 import pandas as pd
 from textblob import TextBlob
-import snscrape.modules.twitter as twt
 import numpy as np
 import datetime
 import matplotlib.pyplot as plt
